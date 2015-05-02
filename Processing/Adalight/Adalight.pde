@@ -84,8 +84,8 @@ static final int timeout = 5000; // 5 seconds
 // For example, '9,6' = 9 LEDs across, 6 LEDs down.
 
 static final int displays[][] = new int[][] {
-   {0,9,6} // Screen 0, 9 LEDs across, 6 LEDs down
-//,{1,9,6} // Screen 1, also 9 LEDs across and 6 LEDs down
+   {0,16,9} // Screen 0, 9 LEDs across, 6 LEDs down
+//,{1,16,9} // Screen 1, also 9 LEDs across and 6 LEDs down
 };
 
 // PER-LED INFORMATION -------------------------------------------------------
@@ -103,28 +103,19 @@ static final int displays[][] = new int[][] {
 // accommodate a monitor stand.  Modify this to match your own setup:
 
 static final int leds[][] = new int[][] {
-  {0,3,5}, {0,2,5}, {0,1,5}, {0,0,5}, // Bottom edge, left half
-  {0,0,4}, {0,0,3}, {0,0,2}, {0,0,1}, // Left edge
-  {0,0,0}, {0,1,0}, {0,2,0}, {0,3,0}, {0,4,0}, // Top edge
-           {0,5,0}, {0,6,0}, {0,7,0}, {0,8,0}, // More top edge
-  {0,8,1}, {0,8,2}, {0,8,3}, {0,8,4}, // Right edge
-  {0,8,5}, {0,7,5}, {0,6,5}, {0,5,5}  // Bottom edge, right half
+//{1,15,8},{1,15,7}, {1,15,6},{1,15,5}, {1,15,4}, {1,15,3}, {1,15,2},{1,15,1}, // Bottom edge, left half
+//{1,15,0}, {1,14,0}, {1,13,0}, {1,12,0},{0,11,0}, {1,10,0}, {1,9,0}, {1,8,0},{1,7,0}, {1,6,0}, {1,5,0}, {1,4,0},{1,3,0}, {1,2,0}, {1,1,0}, {1,0,0},// Left edge
+//{1,0,1}, {1,0,2}, {1,0,3}, {1,0,4},{1,0,5}, {1,0,6}, {1,0,7}, {1,0,8}
 
-/* Hypothetical second display has the same arrangement as the first.
-   But you might not want both displays completely ringed with LEDs;
-   the screens might be positioned where they share an edge in common.
- ,{1,3,5}, {1,2,5}, {1,1,5}, {1,0,5}, // Bottom edge, left half
-  {1,0,4}, {1,0,3}, {1,0,2}, {1,0,1}, // Left edge
-  {1,0,0}, {1,1,0}, {1,2,0}, {1,3,0}, {1,4,0}, // Top edge
-           {1,5,0}, {1,6,0}, {1,7,0}, {1,8,0}, // More top edge
-  {1,8,1}, {1,8,2}, {1,8,3}, {1,8,4}, // Right edge
-  {1,8,5}, {1,7,5}, {1,6,5}, {1,5,5}  // Bottom edge, right half
-*/
+{0,15,8},{0,15,7}, {0,15,6},{0,15,5}, {0,15,4}, {0,15,3}, {0,15,2},{0,15,1}, // Bottom edge, left half
+{0,15,0}, {0,14,0}, {0,13,0}, {0,12,0},{0,11,0}, {0,10,0}, {0,9,0}, {0,8,0},{0,7,0}, {0,6,0}, {0,5,0}, {0,4,0},{0,3,0}, {0,2,0}, {0,1,0}, {0,0,0},// Left edge
+{0,0,1}, {0,0,2}, {0,0,3}, {0,0,4},{0,0,5}, {0,0,6}, {0,0,7}, {0,0,8}
+
 };
 
 // GLOBAL VARIABLES ---- You probably won't need to modify any of this -------
 
-byte[]           serialData  = new byte[6 + leds.length * 3];
+byte[]           serialData  = new byte[1 + leds.length * 3];
 short[][]        ledColor    = new short[leds.length][3],
                  prevColor   = new short[leds.length][3];
 byte[][]         gamma       = new byte[256][3];
@@ -153,7 +144,7 @@ void setup() {
   // Open serial port.  As written here, this assumes the Arduino is the
   // first/only serial device on the system.  If that's not the case,
   // change "Serial.list()[0]" to the name of the port to be used:
-  port = new Serial(this, Serial.list()[0], 115200);
+  port = new Serial(this, Serial.list()[1], 115200);
   // Alternately, in certain situations the following line can be used
   // to detect the Arduino automatically.  But this works ONLY with SOME
   // Arduino boards and versions of Processing!  This is so convoluted
@@ -244,13 +235,7 @@ void setup() {
   // A special header / magic word is expected by the corresponding LED
   // streaming code running on the Arduino.  This only needs to be initialized
   // once (not in draw() loop) because the number of LEDs remains constant:
-  serialData[0] = 'A';                              // Magic word
-  serialData[1] = 'd';
-  serialData[2] = 'a';
-  serialData[3] = (byte)((leds.length - 1) >> 8);   // LED count high byte
-  serialData[4] = (byte)((leds.length - 1) & 0xff); // LED count low byte
-  serialData[5] = (byte)(serialData[3] ^ serialData[4] ^ 0x55); // Checksum
-
+  serialData[0] = 'z';                              // Magic word
   // Pre-compute gamma correction table for LED brightness levels:
   for(i=0; i<256; i++) {
     f           = pow((float)i / 255.0, 2.8);
@@ -308,16 +293,21 @@ Serial openPort() {
 
 
 // PER_FRAME PROCESSING ------------------------------------------------------
-
-void draw () {
+Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+int screenW     = screenSize.width;
+int screenH     = screenSize.height;
+Rectangle rect = new Rectangle(-screenW, 0, screenW, screenH);
   BufferedImage img;
+void draw () {
+
   int           d, i, j, o, c, weight, rb, g, sum, deficit, s2;
   int[]         pxls, offs;
+  
 
   if(useFullScreenCaps == true ) {
     // Capture each screen in the displays array.
     for(d=0; d<nDisplays; d++) {
-      img = bot[d].createScreenCapture(dispBounds[d]);
+      img = bot[d].createScreenCapture(rect);
       // Get location of source pixel data
       screenData[d] =
         ((DataBufferInt)img.getRaster().getDataBuffer()).getData();
@@ -325,7 +315,7 @@ void draw () {
   }
 
   weight = 257 - fade; // 'Weighting factor' for new frame vs. old
-  j      = 6;          // Serial led data follows header / magic word
+  j      = 1;          // Serial led data follows header / magic word
 
   // This computes a single pixel value filtered down from a rectangular
   // section of the screen.  While it would seem tempting to use the native
@@ -423,8 +413,7 @@ public class DisposeHandler {
   public void dispose() {
     // Fill serialData (after header) with 0's, and issue to Arduino...
 //    Arrays.fill(serialData, 6, serialData.length, (byte)0);
-    java.util.Arrays.fill(serialData, 6, serialData.length, (byte)0);
+    java.util.Arrays.fill(serialData, 1, serialData.length, (byte)0);
     if(port != null) port.write(serialData);
   }
 }
-
